@@ -4,13 +4,18 @@ import numpy as np
 import math
 
 # ==============================================================================
-# 1. 基础配置与参考文献/动作库 (完全保留)
+# 1. 基础配置与参考文献/动作库
 # ==============================================================================
 st.set_page_config(
-    page_title="Program Architect V1.0", 
+    page_title="Program Architect V1.1", 
     layout="wide", 
     initial_sidebar_state="expanded"
 )
+
+# 这一段能让手机端在打开时，不会因为缩放问题导致文字太小
+st.markdown("""
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+""", unsafe_allow_html=True)
 
 # 动作词典
 EXERCISE_GLOSSARY = {
@@ -67,35 +72,42 @@ def round_to_plates(weight):
     return math.floor(weight / 2.5 + 0.5) * 2.5
 
 # ==============================================================================
-# 2. 视觉样式 CSS (修复滑块红色尾迹，保持现代灰蓝感)
+# 2. 视觉样式 CSS (修正手机端侧边栏按钮消失问题)
 # ==============================================================================
 st.markdown("""
 <style>
     /* 1. 基础布局 */
     .stApp { background-color: #F8F9FA; color: #2D3748; }
-    header { visibility: hidden; }
-    .block-container { padding-top: 1.5rem !important; }
+    
+    /* 修正：不再彻底隐藏 header，而是只隐藏装饰物，保留侧边栏开关 */
+    header[data-testid="stHeader"] {
+        background: rgba(0,0,0,0) !important; /* 背景透明 */
+        color: #2D3748 !important;
+    }
+    /* 隐藏右侧的部署按钮、菜单按钮，只留左侧的侧边栏控制 */
+    button[data-testid="stHeaderDeployButton"], 
+    button[data-testid="stHeaderMenuButton"] {
+        display: none !important;
+    }
+    
+    .block-container { padding-top: 2.5rem !important; }
 
-    /* 2. 侧边栏 */
+    /* 2. 侧边栏样式 */
     [data-testid="stSidebar"] { background-color: #FFFFFF; border-right: 1px solid #E5E7EB; }
 
-    /* 3. 🛠️ 彻底修复滑块：消除红色尾迹 */
-    /* 未填充轨道颜色 */
+    /* 3. 滑块样式 (保持蓝色，消除红色) */
     div.stSlider > div[data-baseweb="slider"] > div > div {
         background-color: #e5e7eb !important;
     }
-    /* 已填充轨道（尾迹）颜色 - 强制为蓝色而非默认红色 */
     div.stSlider > div[data-baseweb="slider"] > div > div > div {
         background-color: #3B82F6 !important;
     }
-    /* 滑块圆点 (Thumb) */
     div.stSlider > div[data-baseweb="slider"] > div > div > div > div {
         background-color: #FFFFFF !important;
         border: 2px solid #3B82F6 !important;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
     }
 
-    /* 4. 训练卡片 */
+    /* 4. 训练卡片美化 */
     .train-card {
         background-color: #FFFFFF;
         border-radius: 12px;
@@ -113,7 +125,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 3. 核心引擎类
+# 3. 核心引擎类 (保持非线性逻辑)
 # ==============================================================================
 class ProgramEngine:
     def __init__(self, s, b, d, target_s, target_b, target_d, weeks):
@@ -131,10 +143,10 @@ class ProgramEngine:
     def get_phase_info(self, week):
         ratio = week / self.weeks
         is_deload = (week % 4 == 0) and (week != self.weeks)
-        if is_deload: return {"name": "Deload (减载周)", "color": "#10B981", "desc": "大幅降低容量与强度，消除系统性疲劳。", "acc_strategy": "Recovery"}
-        elif ratio <= 0.4: return {"name": "Accumulation (积累期)", "color": "#3B82F6", "desc": "高容量、中低强度。建立肌肉量储备。", "acc_strategy": "Hypertrophy"}
-        elif ratio <= 0.75: return {"name": "Transmutation (力量转化期)", "color": "#F59E0B", "desc": "中容量、高强度。特异性力量转化。", "acc_strategy": "Strength"}
-        else: return {"name": "Realization (实现期)", "color": "#EF4444", "desc": "低容量、极限强度。展现最大力量。", "acc_strategy": "Maintenance"}
+        if is_deload: return {"name": "Deload (减载周)", "color": "#10B981", "desc": "消散疲劳，恢复神经系统。", "acc_strategy": "Recovery"}
+        elif ratio <= 0.4: return {"name": "Accumulation (积累期)", "color": "#3B82F6", "desc": "高容量、中低强度。建立肌肉储备。", "acc_strategy": "Hypertrophy"}
+        elif ratio <= 0.75: return {"name": "Transmutation (转化期)", "color": "#F59E0B", "desc": "强度提升，向专项力量转化。", "acc_strategy": "Strength"}
+        else: return {"name": "Realization (实现期)", "color": "#EF4444", "desc": "低容量、极限强度。展现最高水平。", "acc_strategy": "Maintenance"}
 
     def calculate_weekly_load(self, week, lift_type):
         theoretical_max = self.current[lift_type] + (self.target[lift_type] - self.current[lift_type]) * (week / self.weeks)
@@ -157,14 +169,15 @@ class ProgramEngine:
 
     def calculate_accessories(self, week):
         phase = self.get_phase_info(week)
+        strategy = phase['acc_strategy']
         wave_pos = 4 if "Deload" in phase['name'] else week % 4
         if wave_pos == 0: wave_pos = 3
         
-        if "Recovery" in phase['acc_strategy']: return "2 Sets", "10-12 Reps", "RPE 6"
-        elif "Hypertrophy" in phase['acc_strategy']:
+        if "Recovery" in strategy: return "2 Sets", "10-12 Reps", "RPE 6"
+        elif "Hypertrophy" in strategy:
             sets = 3 + (1 if wave_pos >= 2 else 0)
             return f"{sets} Sets", "10-15 Reps", f"RPE {7 + (wave_pos - 1)}"
-        elif "Strength" in phase['acc_strategy']:
+        elif "Strength" in strategy:
             return "3 Sets", "8-10 Reps", f"RPE {7.5 + (wave_pos * 0.5)}"
         else: return "2 Sets", "6-8 Reps", "RPE 7"
 
@@ -172,28 +185,29 @@ class ProgramEngine:
 # 4. 侧边栏与作者标识
 # ==============================================================================
 st.sidebar.markdown("### 👤 作者：石恩泽")
+st.sidebar.markdown("---")
 st.sidebar.markdown("### 📋 档案 (Profile)")
 c_s = st.sidebar.number_input("深蹲 Current", 200, step=5)
 c_b = st.sidebar.number_input("卧推 Current", 140, step=5)
 c_d = st.sidebar.number_input("硬拉 Current", 220, step=5)
 
 st.sidebar.markdown("### 🎯 目标 (Goal)")
-weeks = st.sidebar.slider("周期长度 (Weeks)", 10, 24, 16)
+weeks_total = st.sidebar.slider("周期长度 (Weeks)", 10, 24, 16)
 t_s = st.sidebar.number_input("目标 深蹲", int(c_s*1.05), step=2)
 t_b = st.sidebar.number_input("目标 卧推", int(c_b*1.05), step=2)
 t_d = st.sidebar.number_input("目标 硬拉", int(c_d*1.05), step=2)
 
-engine = ProgramEngine(c_s, c_b, c_d, t_s, t_b, t_d, weeks)
+engine = ProgramEngine(c_s, c_b, c_d, t_s, t_b, t_d, weeks_total)
 eval_status, eval_color = engine.evaluate_goal()
 
 # ==============================================================================
 # 5. 主界面渲染
 # ==============================================================================
-st.title("Program Architect V1.0")
+st.title("Program Architect V1.1")
 st.caption("基于三本核心著作构建的非线性力量举引擎 | 作者：石恩泽")
 
 col1, col2, col3 = st.columns(3)
-col1.metric("Training Time", f"{weeks} 周")
+col1.metric("Training Time", f"{weeks_total} 周")
 col2.metric("Target Total", f"{t_s+t_b+t_d} kg")
 with col3:
     st.markdown("**可行性评估**")
@@ -201,9 +215,9 @@ with col3:
 
 st.divider()
 
-# 周期导航 (极简滑条)
+# 周期导航
 st.subheader("📍 周期导航 (Week Selector)")
-selected_week = st.slider("Timeline", 1, weeks, 1, label_visibility="collapsed")
+selected_week = st.slider("Timeline", 1, weeks_total, 1, label_visibility="collapsed")
 
 # 获取本周数据
 phase = engine.get_phase_info(selected_week)
@@ -212,7 +226,7 @@ b_w, b_s, b_r, b_rpe = engine.calculate_weekly_load(selected_week, "B")
 d_w, d_s, d_r, d_rpe = engine.calculate_weekly_load(selected_week, "D")
 acc_s, acc_r, acc_rp = engine.calculate_accessories(selected_week)
 
-# 阶段解释
+# 阶段解释卡片
 st.markdown(f"""
 <div style="background-color: white; padding: 20px; border-radius: 10px; border-left: 8px solid {phase['color']}; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
     <h3 style="margin:0; color: {phase['color']};">{phase['name']} - Week {selected_week}</h3>
@@ -222,7 +236,7 @@ st.markdown(f"""
 
 st.write("")
 
-# 训练卡片
+# 训练卡片渲染函数
 def render_card(title, color, lift, weight, sets, reps, rpe, accessories):
     acc_html = "".join([f"<li>{acc}</li>" for acc in accessories])
     return f"""
@@ -239,17 +253,17 @@ def render_card(title, color, lift, weight, sets, reps, rpe, accessories):
 
 c1, c2, c3, c4 = st.columns(4)
 with c1:
-    st.markdown(render_card("Day 1: Squat Focus", phase['color'], "Competition Squat", s_w, s_s, s_r, s_rpe, [f"Pause Squat: {acc_s} x {acc_r}", f"Leg Press: {acc_s} x 12", "Core: 3 Sets"]), unsafe_allow_html=True)
+    st.markdown(render_card("Day 1: Squat", phase['color'], "Competition Squat", s_w, s_s, s_r, s_rpe, [f"Pause Squat: {acc_s} x {acc_r}", f"Leg Press: {acc_s} x 12", "Core: 3 Sets"]), unsafe_allow_html=True)
 with c2:
-    st.markdown(render_card("Day 2: Bench Focus", phase['color'], "Competition Bench", b_w, b_s, b_r, b_rpe, [f"DB OH Press: {acc_s} x 10", f"Chest Support Row: {acc_s} x {acc_r}", "Tricep Pushdown: 3 Sets"]), unsafe_allow_html=True)
+    st.markdown(render_card("Day 2: Bench", phase['color'], "Competition Bench", b_w, b_s, b_r, b_rpe, [f"DB OH Press: {acc_s} x 10", f"Chest Support Row: {acc_s} x {acc_r}", "Tricep Pushdown: 3 Sets"]), unsafe_allow_html=True)
 with c3:
-    st.markdown(render_card("Day 3: Deadlift Focus", phase['color'], "Competition Deadlift", d_w, max(2, d_s-1), d_r, d_rpe, [f"RDL: {acc_s} x 8", f"Leg Curl: {acc_s} x 15", "Back Extension: 3 Sets"]), unsafe_allow_html=True)
+    st.markdown(render_card("Day 3: Deadlift", phase['color'], "Competition Deadlift", d_w, max(2, d_s-1), d_r, d_rpe, [f"RDL (罗马尼亚): {acc_s} x 8", f"Leg Curl: {acc_s} x 15", "Back Extension: 3 Sets"]), unsafe_allow_html=True)
 with c4:
     var_w = round_to_plates(b_w * 0.9)
     st.markdown(render_card("Day 4: Bench Variation", phase['color'], "Close-Grip / Spoto", var_w, b_s, b_r, max(6, b_rpe-0.5), [f"Pull-ups: {acc_s} x AMRAP", f"Dips: {acc_s} x 10", "Face Pulls: 3 x 20"]), unsafe_allow_html=True)
 
 # ==============================================================================
-# 6. 底部信息：全量回归内容
+# 6. 底部信息：参考文献与动作说明
 # ==============================================================================
 st.divider()
 f1, f2 = st.columns(2)
@@ -269,4 +283,4 @@ with f2:
             st.write(f"**{key}**: {val}")
             st.write("---")
 
-st.caption("Program Architect V1.0 | 作者：石恩泽 | 反冒用标识：A001-2024")
+st.caption("Program Architect V1.1 | 作者：石恩泽 | 状态：正式版本发布")
